@@ -12,10 +12,10 @@
 #define TIME_STEP (1/60.0)
 
 #define PARTICLE_TYPE_COUNT 5
-#define CLOSE_DISTANCE .1
-#define FORCE_DISTANCE .2
+#define CLOSE_DISTANCE .03
+#define FORCE_DISTANCE .05
 #define FORCE_MULTI .03
-#define PUSH_FORCE .03
+#define PUSH_FORCE .009
 #define FRICTION 0.99
 
 
@@ -32,7 +32,7 @@ struct Particle
 };
 
 
-int particle_count = 100;
+int particle_count;
 Particle* partciles;
 
 float* type_matrix;
@@ -118,6 +118,24 @@ void update_particles()
 
         p->vx = (p->vx + ax * dt) * FRICTION;
         p->vy = (p->vy + ay * dt) * FRICTION;
+
+        if (p->x > 1)
+        {
+            p->x = 1;
+            p->vx = -p->vx;
+        } else if (p->x < -1) {
+            p->x = -1;
+            p->vx = -p->vx;
+        }
+
+        if (p->y > 1)
+        {
+            p->y = 1;
+            p->vy = -p->vy;
+        } else if (p->y < -1) {
+            p->y = -1;
+            p->vy = -p->vy;
+        }
 
         p++;
     }
