@@ -2,25 +2,41 @@
 #include <cstdlib> 
 #include <glew.h>
 #include <glut.h>
+#include <time.h>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 
 #define M_PI 3.14159265358979323846
 
+#define TIME_STEP (1/60.0)
+
+#define PARTICLE_TYPE_COUNT 5
+#define CLOSE_DISTANCE .1
+#define FORCE_DISTANCE .2
+#define FORCE_MULTI .03
+#define PUSH_FORCE .03
+#define FRICTION 0.99
+
 
 struct Particle
 {
     float x;
     float y;
+
     float vx;
     float vy;
+
+    int type;
  
 };
 
 
 int particle_count = 100;
 Particle* partciles;
+
+float* type_matrix;
+float* type_colors;
 
 static float rand_float()
 {
@@ -31,12 +47,12 @@ static float rand_1_float() {
     return rand_float() * 2.0 - 1.0;
 }
 
-void drawCircle(float r, float x, float y, int resolution) {
+void drawCircle(float r, float x, float y, int resolution, float rc, float gc, float bc) {
     float i = 0.0f;
 
     glBegin(GL_TRIANGLE_FAN);
 
-    glColor3f(0, 0, 1);
+    glColor3f(rc, gc, bc);
     glVertex2f(x, y); // Center
     for (i = 0.0f; i <= resolution; i++)
     {
@@ -52,20 +68,72 @@ void timer(int) {
     glutTimerFunc(1000 / 60, timer, 0);
 }
 
+void update_particles()
+{
+    float dt = TIME_STEP;
+    float dt_2 = dt / 2.0;
+    Particle* p = partciles;
+    for (int i = 0; i < particle_count; i++)
+    {
+        float ax = 0;
+        float ay = 0;
+
+        Particle* p2 = partciles;
+
+        for (int j = 0; j < particle_count; j++)
+        {   
+            if (j == i) { 
+                p2++;
+                continue; 
+            }
+
+            float dx = p2->x - p->x;
+            float dy = p2->y - p->y;
+
+            float distance = sqrt(dx * dx + dy * dy);
+
+            float matrix_value = type_matrix[p2->type * PARTICLE_TYPE_COUNT + p->type];
+            if (distance < CLOSE_DISTANCE)
+            {
+                ax += -(dx/ distance) * (CLOSE_DISTANCE - distance) * (PUSH_FORCE / CLOSE_DISTANCE);
+                ay += -(dy / distance) * (CLOSE_DISTANCE - distance) * (PUSH_FORCE / CLOSE_DISTANCE);
+            }
+            else if (distance < CLOSE_DISTANCE + FORCE_DISTANCE) {
+                ax += (dx / distance) * (distance - CLOSE_DISTANCE) * (FORCE_MULTI / FORCE_DISTANCE) * matrix_value;
+                ay += (dy / distance) * (distance - CLOSE_DISTANCE) * (FORCE_MULTI / FORCE_DISTANCE) * matrix_value;
+            }
+            else if (distance < CLOSE_DISTANCE + FORCE_DISTANCE * 2) {
+                ax += (dx / distance) * (FORCE_DISTANCE * 2 + CLOSE_DISTANCE - distance) 
+                    * (FORCE_MULTI / FORCE_DISTANCE) * matrix_value;
+                ay += (dy / distance) * (FORCE_DISTANCE * 2 + CLOSE_DISTANCE - distance)
+                    * (FORCE_MULTI / FORCE_DISTANCE) * matrix_value;
+            }
+
+
+            p2++;
+        }
+
+        p->x += p->vx * dt + 0.5 * ax * dt * dt;
+        p->y += p->vy * dt + 0.5 * ay * dt * dt;
+
+        p->vx = (p->vx + ax * dt) * FRICTION;
+        p->vy = (p->vy + ay * dt) * FRICTION;
+
+        p++;
+    }
+}
+
 void display() {  // Display function will draw the image.
 
     glClearColor(0, 0, 0, 1);  // (In fact, this is the default.)
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Temp
-    float dt = 1 / 60.0;
+    update_particles();
 
     Particle* p = partciles;
     for (int i = 0; i < particle_count; i++)
     {
-        p->x += dt * p->vx;
-        p->y += dt * p->vy;
-        drawCircle(.01, p->x, p->y, 3);
+        drawCircle(.01, p->x, p->y, 3, type_colors[p->type*3], type_colors[p->type * 3+1], type_colors[p->type * 3+2]);
         p++;
     }
 
@@ -75,7 +143,9 @@ void display() {  // Display function will draw the image.
 
 int main(int argc, char** argv) {  // Initialize GLUT and 
 
-    int particle_count = 100;
+    particle_count = 1000;
+
+    srand(time(NULL));
 
     partciles = (Particle*)malloc(sizeof Particle * particle_count);
     Particle* particle = partciles;
@@ -83,9 +153,32 @@ int main(int argc, char** argv) {  // Initialize GLUT and
     {   
         particle->x = rand_1_float();
         particle->y = rand_1_float();
-        particle->vx = rand_1_float();
-        particle->vy = rand_1_float();
+        particle->vx = rand_1_float() / 5.0;
+        particle->vy = rand_1_float() / 5.0;
+        particle->type = (int) (rand_float() * PARTICLE_TYPE_COUNT);
         particle++;
+    }
+
+    // Filling Type Matrix
+    type_matrix = (float*)malloc(sizeof(float) * PARTICLE_TYPE_COUNT * PARTICLE_TYPE_COUNT);
+    float* matrix_fill = type_matrix;
+    for (int i = 0; i < PARTICLE_TYPE_COUNT * PARTICLE_TYPE_COUNT; i++)
+    {
+        *matrix_fill = rand_1_float();
+        matrix_fill++;
+    }
+
+    // Type Colors
+    type_colors = (float*) malloc(sizeof(float) * 3 * PARTICLE_TYPE_COUNT);
+    float* type_color_fill = type_colors;
+    for (int i = 0; i < PARTICLE_TYPE_COUNT; i++)
+    {
+        *type_color_fill = 0.5 + rand_float() * .5; // R
+        type_color_fill++;
+        *type_color_fill = 0.5 + rand_float() * .5; // G
+        type_color_fill++;
+        *type_color_fill = 0.5 + rand_float() * .5; // B
+        type_color_fill++;
     }
 
     glutInit(&argc, argv);
